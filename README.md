@@ -1,4 +1,4 @@
----
+
 ## ⚠️ Aviso muy importante (Descargo de responsabilidad)
 
 ¡Escucha con atención! Aunque este robot es muy inteligente y usa matemáticas avanzadas, hay algunas cosas que debes saber:
@@ -7,8 +7,6 @@
 * **El robot no es adivino:** El script usa la historia para "adivinar" lo que es más probable, pero **no es exacto**. Los números que salen son solo sugerencias basadas en estadísticas.
 * **No garantiza premios:** Usar este programa **no significa que vayas a ganar dinero**. A veces la IA acierta y muchas otras veces no.
 * **Juego Responsable:** Este programa es solo para **divertirse y aprender** programación. Nunca gastes dinero que necesites para cosas importantes. ¡La suerte es caprichosa!
-
----
 
 # 🚀 Mi Súper Máquina de Adivinar Lotería (con IA)
 
