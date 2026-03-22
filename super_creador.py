@@ -20,27 +20,45 @@ from sklearn.cluster import KMeans
 
 ARCHIVO_CSV = 'historico_limpio.csv'
 
+import os
+import sys
+import subprocess
+import random # <--- Asegúrate de que esta línea esté arriba
+
+# --- FUNCIÓN DE CARGA MEJORADA ---
 def cargar_y_analizar():
     if not os.path.exists(ARCHIVO_CSV): return None, None, None
     try:
         df = pd.read_csv(ARCHIVO_CSV)
-        cols = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6']
-        for c in cols: df[c] = pd.to_numeric(df[c], errors='coerce')
-        df = df.dropna(subset=cols)
-        todas = pd.concat([df[c] for c in cols]).astype(float)
+        # Limpieza de columnas de bolas
+        cols_bolas = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6']
+        for c in cols_bolas: df[c] = pd.to_numeric(df[c], errors='coerce')
+        df = df.dropna(subset=cols_bolas)
+        
+        # Aseguramos que el Reintegro sea numérico y no tenga fallos
+        if 'Reintegro' in df.columns:
+            df['Reintegro'] = pd.to_numeric(df['Reintegro'], errors='coerce').fillna(0).astype(int)
+        else:
+            df['Reintegro'] = [random.randint(0, 9) for _ in range(len(df))] # Por si no existe la columna
+
+        todas = pd.concat([df[c] for c in cols_bolas]).astype(float)
         frec = todas.value_counts().sort_index()
         datos_ia = pd.DataFrame({'Numero': frec.index.astype(int), 'Frecuencia': frec.values.astype(float)})
+        
         return df, datos_ia, {"calientes": frec.nlargest(5).index.tolist(), "frios": frec.nsmallest(5).index.tolist()}
-    except: return None, None, None
+    except Exception as e:
+        print(f"Error cargando: {e}")
+        return None, None, None
 
+# --- GENERADOR CON REINTEGRO VARIABLE ---
 def generar_ia_inteligente(df, d_ia):
-    # 1. Calculamos la probabilidad de cada reintegro (0-9) basado en el histórico
-    frec_reintegro = df['Reintegro'].value_counts(normalize=True).sort_index()
-    opciones_reintegro = frec_reintegro.index.tolist()
-    pesos_reintegro = frec_reintegro.values.tolist()
+    # Calculamos probabilidades frescas cada vez que se llama a la función
+    # Esto evita que se quede "atascado" en un solo valor
+    counts = df['Reintegro'].value_counts(normalize=True)
+    opciones = counts.index.tolist()
+    pesos = counts.values.tolist()
 
     for _ in range(200):
-        # Lógica de Clustering para los números principales
         km = KMeans(n_clusters=6, n_init=5)
         d_ia['Cluster'] = km.fit_predict(d_ia[['Frecuencia']].values)
         
@@ -54,19 +72,13 @@ def generar_ia_inteligente(df, d_ia):
         pares = len([x for x in apuesta if x % 2 == 0])
         impares = 6 - pares
         
-        # Filtros de Suma y Paridad
         if (130 <= suma <= 210) and (1 <= pares <= 5):
-            # ELEGIMOS REINTEGRO DINÁMICO:
-            # Usamos random.choices con pesos para que los que más salen tengan más probabilidad,
-            # pero que pueda salir cualquiera del 0 al 9.
-            r_elegido = random.choices(opciones_reintegro, weights=pesos_reintegro, k=1)[0]
-            
+            # Usamos random.random() combinado con los pesos para máxima variedad
+            r_elegido = random.choices(opciones, weights=pesos, k=1)[0]
             return apuesta, int(r_elegido), suma, f"{pares}P/{impares}I"
             
-    # Fallback por si no encuentra combinación en 200 intentos
-    r_random = random.choices(opciones_reintegro, weights=pesos_reintegro, k=1)[0]
-    return apuesta, int(r_random), sum(apuesta), f"{pares}P/{impares}I"
-
+    # Si no cumple filtros, devolvemos uno al azar basado en estadística igualmente
+    return apuesta, int(random.choice(opciones)), sum(apuesta), f"{pares}P/{impares}I"
 class AppPro:
     def __init__(self, root):
         self.root = root
