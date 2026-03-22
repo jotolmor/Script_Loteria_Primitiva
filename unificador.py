@@ -1,47 +1,74 @@
 import pandas as pd
+import io
+import csv
 
-# Nombre de tu archivo subido
+# Nombre de tu archivo
 ARCHIVO_ENTRADA = 'datos.xlsx'
 ARCHIVO_SALIDA = 'historico_limpio.csv'
 
-print("🧼 Iniciando limpieza profunda de datos históricos...")
+print("🧼 Iniciando limpieza profunda de datos (Modo Manual Blindado)...")
 
 try:
-    # 1. Cargamos el archivo saltando la primera fila de basura si la hay
-    # Usamos low_memory=False para evitar avisos con archivos grandes
-    df = pd.read_csv(ARCHIVO_ENTRADA, skiprows=1, low_memory=False)
-
-    # 2. Renombramos las columnas para que Python las entienda bien
-    # Tu archivo tiene: Fecha, B1, B2, B3, B4, B5, B6, Comp, Reintegro
-    columnas = ['Fecha', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'Complementario', 'Reintegro']
-    df.columns = columnas
-
-    # 3. Limpieza de filas críticas
-    # Eliminamos filas donde la fecha o la primera bola estén vacías
-    df = df.dropna(subset=['Fecha', 'B1'])
-
-    # 4. Convertir columnas a números
-    # 'coerce' transforma cualquier texto raro en "NaN" (vacío) y luego lo limpiamos
-    cols_numeros = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'Complementario', 'Reintegro']
-    for col in cols_numeros:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-
-    # 5. Formatear la fecha
-    df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+    datos_limpios = []
     
-    # 6. Ordenar por fecha de más antiguo a más moderno
+    # 1. Abrimos el archivo como texto puro
+    with open(ARCHIVO_ENTRADA, 'r', encoding='latin-1') as f:
+        # Usamos el lector de CSV básico de Python que es más flexible con las comas
+        lector = csv.reader(f, delimiter=',')
+        
+        for fila in lector:
+            # Una fila válida debe tener al menos 8 o 9 elementos
+            if len(fila) >= 7:
+                fecha = fila[0].strip()
+                # Comprobamos si la primera columna parece una fecha (ej: 2024-10-31 o 31/10/2024)
+                # Buscamos que empiece por un número
+                if fecha and fecha[0].isdigit():
+                    # Nos quedamos solo con las columnas importantes (Fecha + 6 bolas + Comp + R)
+                    # Tomamos hasta 9 elementos si existen
+                    datos_limpios.append(fila[:9])
+
+    if not datos_limpios:
+        # Si no funcionó con comas, probamos con punto y coma (común en Excel español)
+        print("💡 Probando con punto y coma...")
+        with open(ARCHIVO_ENTRADA, 'r', encoding='latin-1') as f:
+            lector = csv.reader(f, delimiter=';')
+            for fila in lector:
+                if len(fila) >= 7:
+                    fecha = fila[0].strip()
+                    if fecha and fecha[0].isdigit():
+                        datos_limpios.append(fila[:9])
+
+    # 2. Una vez filtrado, lo convertimos en un DataFrame de Pandas para rematar el formato
+    df = pd.DataFrame(datos_limpios)
+    
+    # Nombrar columnas (Aseguramos 9 nombres)
+    columnas = ['Fecha', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'Complementario', 'Reintegro']
+    # Si el archivo tiene menos columnas (ej: le falta el reintegro), rellenamos
+    while len(df.columns) < len(columnas):
+        df[len(df.columns)] = ""
+    
+    df.columns = columnas[:len(df.columns)]
+
+    # 3. Limpieza final de valores
+    for col in df.columns:
+        if col != 'Fecha':
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # 4. Formatear fecha y ordenar
+    df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+    df = df.dropna(subset=['Fecha', 'B1']) # Solo filas con fecha y al menos la primera bola
     df = df.sort_values(by='Fecha', ascending=True)
 
-    # 7. Guardar el resultado final
-    # Guardamos sin el índice para que el CSV sea más puro
+    # 5. Guardar el archivo maestro
     df.to_csv(ARCHIVO_SALIDA, index=False)
 
-    print("-" * 30)
-    print(f"✅ ¡LIMPIEZA COMPLETADA!")
-    print(f"📊 Sorteos procesados: {len(df)}")
-    print(f"📅 Rango: {df['Fecha'].min().date()} hasta {df['Fecha'].max().date()}")
-    print(f"📁 Archivo generado: {ARCHIVO_SALIDA}")
-    print("-" * 30)
+    print("-" * 35)
+    print(f"✅ ¡POR FIN LOGRADO!")
+    print(f"📊 Sorteos rescatados: {len(df)}")
+    print(f"📅 Desde: {df['Fecha'].min().date()}")
+    print(f"📅 Hasta: {df['Fecha'].max().date()}")
+    print(f"📁 Archivo listo: {ARCHIVO_SALIDA}")
+    print("-" * 35)
 
 except Exception as e:
-    print(f"❌ Error durante la limpieza: {e}")
+    print(f"❌ Error crítico inesperado: {e}")
